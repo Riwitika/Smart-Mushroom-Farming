@@ -41,6 +41,9 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -259,12 +262,28 @@ fun PredictionScreen(
                     exit = fadeOut()
                 ) {
                     uiState.predictionResult?.let { result ->
-                        val badgeColor = when (result.diseaseGrowthPossibility) {
-                            "Low" -> Color(0xFF4CAF50)
-                            "Moderate" -> Color(0xFFFF9800)
-                            "High" -> Color(0xFFF44336)
-                            else -> MaterialTheme.colorScheme.primary
+                        val possibility = result.diseaseGrowthPossibility
+                        val healthStatus = when (possibility.lowercase()) {
+                            "low" -> "Healthy"
+                            "moderate" -> "Moderate"
+                            else -> "Bad"
                         }
+                        val riskLevel = when (possibility.lowercase()) {
+                            "low" -> "Low Risk"
+                            "moderate" -> "Medium Risk"
+                            else -> "High Risk"
+                        }
+                        val badgeText = when (possibility.lowercase()) {
+                            "low" -> "🟢 Healthy"
+                            "moderate" -> "🟡 Moderate"
+                            else -> "🔴 High Risk"
+                        }
+                        val badgeColor = when (possibility.lowercase()) {
+                            "low" -> Color(0xFF4CAF50)
+                            "moderate" -> Color(0xFFFF9800)
+                            else -> Color(0xFFF44336)
+                        }
+                        val dateString = SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault()).format(Date(result.timestamp))
 
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -284,7 +303,7 @@ fun PredictionScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Prediction Output",
+                                        text = "AI Prediction Result",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -296,7 +315,7 @@ fun PredictionScreen(
                                             .padding(horizontal = 12.dp, vertical = 6.dp)
                                     ) {
                                         Text(
-                                            text = result.diseaseGrowthPossibility.uppercase(),
+                                            text = badgeText,
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
                                             style = MaterialTheme.typography.labelMedium
@@ -304,25 +323,49 @@ fun PredictionScreen(
                                     }
                                 }
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Row {
                                     Text(
-                                        text = "Possibility Level: ",
+                                        text = "Health Status: ",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                                     )
                                     Text(
-                                        text = result.diseaseGrowthPossibility,
+                                        text = healthStatus,
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = badgeColor
                                     )
                                 }
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Row {
+                                    Text(
+                                        text = "Disease Growth Possibility: ",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    )
+                                    Text(
+                                        text = possibility,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = badgeColor
+                                    )
+                                }
+
+                                Row {
+                                    Text(
+                                        text = "Disease Risk Level: ",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    )
+                                    Text(
+                                        text = riskLevel,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = badgeColor
+                                    )
+                                }
+
+                                Row {
                                     Text(
                                         text = "AI Confidence Score: ",
                                         style = MaterialTheme.typography.bodyMedium,
@@ -333,6 +376,20 @@ fun PredictionScreen(
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                Row {
+                                    Text(
+                                        text = "Inference Timestamp: ",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    )
+                                    Text(
+                                        text = dateString,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
 
@@ -410,7 +467,7 @@ fun DropdownSelector(
         ) {
             options.forEach { selectionOption ->
                 DropdownMenuItem(
-                    text = { Text(text = selectionOption) },
+                    text = { Text(selectionOption) },
                     onClick = {
                         onOptionSelected(selectionOption)
                         expanded = false
