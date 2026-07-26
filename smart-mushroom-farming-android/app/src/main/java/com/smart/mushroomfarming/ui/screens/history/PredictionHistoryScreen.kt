@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,21 +67,22 @@ fun PredictionHistoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedFilter by viewModel.filterOption.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     val scrollState = rememberScrollState()
     val pullToRefreshState = rememberPullToRefreshState()
 
+    // Handle pull-to-refresh reload triggering (only when swiped)
     if (pullToRefreshState.isRefreshing) {
         LaunchedEffect(true) {
             viewModel.refreshHistory()
         }
     }
 
+    // Sync pull-to-refresh UI state - only end refresh. Do NOT call startRefresh manually to prevent infinite loop.
     LaunchedEffect(isLoading) {
         if (!isLoading) {
             pullToRefreshState.endRefresh()
-        } else {
-            pullToRefreshState.startRefresh()
         }
     }
 
@@ -166,6 +169,40 @@ fun PredictionHistoryScreen(
                         ShimmerPlaceholder(modifier = Modifier.fillMaxWidth().height(90.dp))
                         ShimmerPlaceholder(modifier = Modifier.fillMaxWidth().height(90.dp))
                         ShimmerPlaceholder(modifier = Modifier.fillMaxWidth().height(90.dp))
+                    }
+                } else if (errorMessage != null && historyList.isEmpty()) {
+                    // Error and Retry visual card layout
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(MaterialTheme.colorScheme.errorContainer, shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = errorMessage ?: "Failed to load prediction history",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.loadHistory() }
+                        ) {
+                            Text("Retry")
+                        }
                     }
                 } else if (historyList.isEmpty()) {
                     // Custom empty illustration state
@@ -284,6 +321,14 @@ fun PredictionHistoryScreen(
                             }
                         }
                     }
+                }
+
+                // Center CircularProgressIndicator only during initial load when list is empty
+                if (isLoading && historyList.isEmpty()) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
 
                 PullToRefreshContainer(

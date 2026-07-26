@@ -38,6 +38,9 @@ class PredictionHistoryViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     private val _detailItem = MutableStateFlow<FarmingTelemetry?>(null)
     val detailItem: StateFlow<FarmingTelemetry?> = _detailItem.asStateFlow()
 
@@ -72,12 +75,14 @@ class PredictionHistoryViewModel @Inject constructor(
     fun loadHistory() {
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
             try {
                 repository.getPredictionHistory().collect { list ->
                     _history.value = list
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "Failed to load prediction history"
                 _isLoading.value = false
             }
         }
@@ -93,6 +98,10 @@ class PredictionHistoryViewModel @Inject constructor(
 
     fun onFilterOptionChanged(option: FilterOption) {
         _filterOption.value = option
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     fun loadPredictionById(id: String) {
