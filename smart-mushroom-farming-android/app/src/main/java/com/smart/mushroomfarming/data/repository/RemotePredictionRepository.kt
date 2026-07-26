@@ -33,6 +33,7 @@ class RemotePredictionRepository @Inject constructor(
 ) : PredictionRepository {
 
     private val _history = MutableStateFlow<List<FarmingTelemetry>>(emptyList())
+    private var lastUserId: String? = null
 
     override fun runPrediction(
         temperature: Double,
@@ -43,6 +44,12 @@ class RemotePredictionRepository @Inject constructor(
     ): Flow<FarmingTelemetry> = flow {
         // 1. Retrieve the authenticated user
         val user = authRepository.getCurrentUser() ?: throw Exception("User not authenticated.")
+
+        // Ensure user ID matches the current cached history user ID
+        if (user.uid != lastUserId) {
+            _history.value = emptyList()
+            lastUserId = user.uid
+        }
 
         // 2. Query prediction output from FastAPI backend
         val response = try {
@@ -134,81 +141,54 @@ class RemotePredictionRepository @Inject constructor(
         }
     }
 
-    override fun getPredictionHistory(): Flow<List<FarmingTelemetry>> = flow {
+    override fun getPredictionHistory(): Flow<List<FarmingTelemetry>> {
         val user = authRepository.getCurrentUser()
         if (user == null) {
-            emit(emptyList())
-            return@flow
+            _history.value = emptyList()
+            lastUserId = null
+            return _history
         }
 
-        try {
-            val db = FirebaseFirestore.getInstance()
-            val snapshot = db.collection("users")
-                .document(user.uid)
-                .collection("predictions")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
-                .get()
-                .await()
-
-            val list = snapshot.documents.mapNotNull { doc ->
-                FarmingTelemetry(
-                    id = doc.id,
-                    temperature = doc.getDouble("temperature") ?: 0.0,
-                    humidity = doc.getDouble("humidity") ?: 0.0,
-                    ventilation = doc.getString("ventilation") ?: "Medium",
-                    lightIntensity = doc.getString("lightIntensity") ?: "Medium",
-                    ph = doc.getDouble("ph") ?: 0.0,
-                    diseaseGrowthPossibility = doc.getString("diseaseGrowthPossibility") ?: "Low",
-                    confidence = doc.getLong("confidence")?.toInt() ?: 95,
-                    recommendation = doc.getString("recommendation") ?: "",
-                    timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
-                )
-            }
-
-            _history.value = list
-            emit(list)
-        } catch (e: Exception) {
-            // Fallback to local logs cache if offline/failed
-            emit(_history.value)
+        // Detect user account switches and clear log memory cache instantly
+        if (user.uid != lastUserId) {
+            _history.value = emptyList()
+            lastUserId = user.uid
         }
+
+        // Asynchronously load the prediction logs history from Firestore without blocking UI thread
+        fetchHistoryFromFirestore(user.uid)
+
+        return _history
     }
 
-    override fun getPredictionById(id: String): Flow<FarmingTelemetry?> = flow {
-        val user = authRepository.getCurrentUser()
-        if (user == null) {
-            emit(null)
-            return@flow
-        }
-
-        try {
-            val db = FirebaseFirestore.getInstance()
-            val doc = db.collection("users")
-                .document(user.uid)
-                .collection("predictions")
-                .document(id)
-                .get()
-                .await()
-
-            if (doc.exists()) {
-                val telemetry = FarmingTelemetry(
-                    id = doc.id,
-                    temperature = doc.getDouble("temperature") ?: 0.0,
-                    humidity = doc.getDouble("humidity") ?: 0.0,
-                    ventilation = doc.getString("ventilation") ?: "Medium",
-                    lightIntensity = doc.getString("lightIntensity") ?: "Medium",
-                    ph = doc.getDouble("ph") ?: 0.0,
-                    diseaseGrowthPossibility = doc.getString("diseaseGrowthPossibility") ?: "Low",
-                    confidence = doc.getLong("confidence")?.toInt() ?: 95,
-                    recommendation = doc.getString("recommendation") ?: "",
-                    timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
-                )
-                emit(telemetry)
-            } else {
-                emit(_history.value.find { it.id == id })
+    private fun fetchHistoryFromFirestore(uid: String) {
+        val db = FirebaseFirestore.getInstance()
+        db.collection("users")
+            .document(uid)
+            .collection("predictions")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val list = snapshot.documents.mapNotNull { doc ->
+                    FarmingTelemetry(
+                        id = doc.id,
+                        temperature = doc.getDouble("temperature") ?: 0.0,
+                        humidity = doc.getDouble("humidity") ?: 0.0,
+                        ventilation = doc.getString("ventilation") ?: "Medium",
+                        lightIntensity = doc.getString("lightIntensity") ?: "Medium",
+                        ph = doc.getDouble("ph") ?: 0.0,
+                        diseaseGrowthPossibility = doc.getString("diseaseGrowthPossibility") ?: "Low",
+                        confidence = doc.getLong("confidence")?.toInt() ?: 95,
+                        recommendation = doc.getString("recommendation") ?: "",
+                        timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                    )
+                }
+                _history.value = list
             }
-        } catch (e: Exception) {
-            emit(_history.value.find { it.id == id })
-        }
+    }
+
+    override fun getPredictionById(id: String): Flow<FarmingTelemetry?> {
+        return _history.map { list -> list.find { it.id == id } }
     }
 
     // Adapt GMS tasks to coroutines
