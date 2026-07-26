@@ -37,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -48,14 +47,15 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.smart.mushroomfarming.domain.model.AuthState
 import com.smart.mushroomfarming.ui.components.MushroomCard
 import com.smart.mushroomfarming.ui.components.MushroomTextField
 import com.smart.mushroomfarming.ui.components.MushroomTopAppBar
 import com.smart.mushroomfarming.ui.components.PrimaryMushroomButton
 import com.smart.mushroomfarming.ui.theme.spacing
-import com.smart.mushroomfarming.utils.Resource
 
 @Composable
 fun ForgotPasswordScreen(
@@ -78,6 +78,14 @@ fun ForgotPasswordScreen(
                     // Not expected here
                 }
             }
+        }
+    }
+
+    LaunchedEffect(uiState.authResult) {
+        val result = uiState.authResult
+        if (result is AuthState.Error) {
+            snackbarHostState.showSnackbar(result.message)
+            viewModel.clearResult()
         }
     }
 
@@ -197,7 +205,7 @@ fun ForgotPasswordScreen(
                         focusManager.clearFocus()
                         viewModel.forgotPassword()
                     },
-                    isLoading = uiState.authResult is Resource.Loading,
+                    isLoading = uiState.authResult is AuthState.Loading,
                     modifier = Modifier.fillMaxWidth()
                 )
 

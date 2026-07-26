@@ -2,7 +2,13 @@ package com.smart.mushroomfarming.ui.screens.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.smart.mushroomfarming.utils.Resource
+import com.smart.mushroomfarming.domain.model.AuthState
+import com.smart.mushroomfarming.domain.model.User
+import com.smart.mushroomfarming.domain.usecase.ForgotPasswordUseCase
+import com.smart.mushroomfarming.domain.usecase.GetCurrentUserUseCase
+import com.smart.mushroomfarming.domain.usecase.LoginUseCase
+import com.smart.mushroomfarming.domain.usecase.LogoutUseCase
+import com.smart.mushroomfarming.domain.usecase.RegisterUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +26,13 @@ sealed class AuthUiEvent {
 }
 
 @HiltViewModel
-class AuthViewModel @Inject constructor() : ViewModel() {
+class AuthViewModel @Inject constructor(
+    private val loginUseCase: LoginUseCase,
+    private val registerUseCase: RegisterUseCase,
+    private val forgotPasswordUseCase: ForgotPasswordUseCase,
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val logoutUseCase: LogoutUseCase
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -45,7 +57,15 @@ class AuthViewModel @Inject constructor() : ViewModel() {
     }
 
     fun clearResult() {
-        _uiState.update { it.copy(authResult = null) }
+        _uiState.update { it.copy(authResult = AuthState.Idle) }
+    }
+
+    fun isUserLoggedIn(): Boolean {
+        return getCurrentUserUseCase() != null
+    }
+
+    fun getCurrentUser(): User? {
+        return getCurrentUserUseCase()
     }
 
     private fun isValidEmail(email: String): Boolean {
@@ -53,15 +73,27 @@ class AuthViewModel @Inject constructor() : ViewModel() {
         return email.matches(emailRegex.toRegex())
     }
 
+    private fun isValidPassword(password: String): Boolean {
+        if (password.length < 8) return false
+        val hasUppercase = password.any { it.isUpperCase() }
+        val hasLowercase = password.any { it.isLowerCase() }
+        val hasNumber = password.any { it.isDigit() }
+        val hasSpecial = password.any { !it.isLetterOrDigit() }
+        return hasUppercase && hasLowercase && hasNumber && hasSpecial
+    }
+
     fun login() {
         if (!validateLoginInputs()) return
         
         viewModelScope.launch {
-            _uiState.update { it.copy(authResult = Resource.Loading) }
-            kotlinx.coroutines.delay(1200)
-            
-            _uiState.update { it.copy(authResult = Resource.Success(Unit)) }
-            _uiEvent.emit(AuthUiEvent.AuthSuccess)
+            _uiState.update { it.copy(authResult = AuthState.Loading) }
+            try {
+                loginUseCase(_uiState.value.email, _uiState.value.password)
+                _uiState.update { it.copy(authResult = AuthState.Success(Unit)) }
+                _uiEvent.emit(AuthUiEvent.AuthSuccess)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(authResult = AuthState.Error(getErrorMessage(e))) }
+            }
         }
     }
 
@@ -69,11 +101,18 @@ class AuthViewModel @Inject constructor() : ViewModel() {
         if (!validateRegisterInputs()) return
         
         viewModelScope.launch {
-            _uiState.update { it.copy(authResult = Resource.Loading) }
-            kotlinx.coroutines.delay(1200)
-            
-            _uiState.update { it.copy(authResult = Resource.Success(Unit)) }
-            _uiEvent.emit(AuthUiEvent.AuthSuccess)
+            _uiState.update { it.copy(authResult = AuthState.Loading) }
+            try {
+                registerUseCase(
+                    _uiState.value.email,
+                    _uiState.value.password,
+                    _uiState.value.name
+                )
+                _uiState.update { it.copy(authResult = AuthState.Success(Unit)) }
+                _uiEvent.emit(AuthUiEvent.AuthSuccess)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(authResult = AuthState.Error(getErrorMessage(e))) }
+            }
         }
     }
 
@@ -81,11 +120,26 @@ class AuthViewModel @Inject constructor() : ViewModel() {
         if (!validateForgotPasswordInputs()) return
         
         viewModelScope.launch {
-            _uiState.update { it.copy(authResult = Resource.Loading) }
-            kotlinx.coroutines.delay(1200)
-            
-            _uiState.update { it.copy(authResult = Resource.Success(Unit)) }
-            _uiEvent.emit(AuthUiEvent.ShowSnackbar("Password recovery link sent successfully"))
+            _uiState.update { it.copy(authResult = AuthState.Loading) }
+            try {
+                forgotPasswordUseCase(_uiState.value.email)
+                _uiState.update { it.copy(authResult = AuthState.Success(Unit)) }
+                _uiEvent.emit(AuthUiEvent.ShowSnackbar("Password recovery link sent successfully"))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(authResult = AuthState.Error(getErrorMessage(e))) }
+            }
+        }
+    }
+
+    fun logout(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                logoutUseCase()
+                onSuccess()
+            } catch (e: Exception) {
+                // Non-critical, simply redirect or handle error locally
+                onSuccess()
+            }
         }
     }
 
@@ -104,9 +158,6 @@ class AuthViewModel @Inject constructor() : ViewModel() {
 
         if (password.isEmpty()) {
             _uiState.update { it.copy(passwordError = "Password cannot be empty") }
-            isValid = false
-        } else if (password.length < 6) {
-            _uiState.update { it.copy(passwordError = "Password must be at least 6 characters") }
             isValid = false
         }
 
@@ -136,8 +187,10 @@ class AuthViewModel @Inject constructor() : ViewModel() {
         if (password.isEmpty()) {
             _uiState.update { it.copy(passwordError = "Password cannot be empty") }
             isValid = false
-        } else if (password.length < 6) {
-            _uiState.update { it.copy(passwordError = "Password must be at least 6 characters") }
+        } else if (!isValidPassword(password)) {
+            _uiState.update { 
+                it.copy(passwordError = "Password must be at least 8 characters, and contain uppercase, lowercase, number, and special character") 
+            }
             isValid = false
         }
 
@@ -162,5 +215,21 @@ class AuthViewModel @Inject constructor() : ViewModel() {
         }
 
         return isValid
+    }
+
+    private fun getErrorMessage(e: Throwable): String {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("network", ignoreCase = true) || msg.contains("route", ignoreCase = true) || msg.contains("socket", ignoreCase = true) -> 
+                "Network unavailable. Please check your internet connection."
+            msg.contains("password is invalid", ignoreCase = true) || msg.contains("weak", ignoreCase = true) ->
+                "Weak password. Password must contain at least 8 characters with letters, numbers, and special symbols."
+            msg.contains("user not found", ignoreCase = true) || msg.contains("no user record", ignoreCase = true) || msg.contains("wrong", ignoreCase = true) || msg.contains("invalid credentials", ignoreCase = true) ->
+                "Wrong credentials. Please check your email and password."
+            msg.contains("invalid email", ignoreCase = true) || msg.contains("badly formatted", ignoreCase = true) ->
+                "Invalid email format."
+            msg.isNotEmpty() -> msg
+            else -> "An unknown error occurred. Please try again."
+        }
     }
 }

@@ -30,12 +30,16 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.smart.mushroomfarming.ui.screens.auth.AuthViewModel
 import com.smart.mushroomfarming.ui.theme.spacing
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    onNavigateToLogin: () -> Unit
+    onNavigateToDashboard: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
     val scale = remember { Animatable(0f) }
     val alpha = remember { Animatable(0f) }
@@ -57,7 +61,13 @@ fun SplashScreen(
         )
         // Keep splash screen visible for 1.5 seconds
         delay(1500)
-        onNavigateToLogin()
+        
+        // Route according to active session
+        if (viewModel.isUserLoggedIn()) {
+            onNavigateToDashboard()
+        } else {
+            onNavigateToLogin()
+        }
     }
 
     Box(

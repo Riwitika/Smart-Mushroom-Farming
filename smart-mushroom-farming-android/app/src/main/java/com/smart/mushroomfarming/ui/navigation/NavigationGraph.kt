@@ -5,12 +5,18 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.smart.mushroomfarming.ui.screens.auth.AuthViewModel
 import com.smart.mushroomfarming.ui.screens.auth.ForgotPasswordScreen
 import com.smart.mushroomfarming.ui.screens.auth.LoginScreen
 import com.smart.mushroomfarming.ui.screens.auth.RegisterScreen
+import com.smart.mushroomfarming.ui.screens.dashboard.DashboardScreen
+import com.smart.mushroomfarming.ui.screens.dashboard.PredictionHistoryScreen
+import com.smart.mushroomfarming.ui.screens.dashboard.RecommendationsScreen
+import com.smart.mushroomfarming.ui.screens.dashboard.SettingsScreen
 import com.smart.mushroomfarming.ui.screens.splash.SplashScreen
 
 @Composable
@@ -46,37 +52,103 @@ fun NavigationGraph() {
         }
     ) {
         composable(Screen.Splash.route) {
+            val splashViewModel = hiltViewModel<AuthViewModel>()
             SplashScreen(
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                },
                 onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
-                }
+                },
+                viewModel = splashViewModel
             )
         }
         
         composable(Screen.Login.route) {
+            val loginViewModel = hiltViewModel<AuthViewModel>()
             LoginScreen(
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
                 },
                 onNavigateToForgotPassword = {
                     navController.navigate(Screen.ForgotPassword.route)
-                }
+                },
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                viewModel = loginViewModel
             )
         }
         
         composable(Screen.Register.route) {
+            val registerViewModel = hiltViewModel<AuthViewModel>()
             RegisterScreen(
                 onNavigateToLogin = {
                     navController.popBackStack()
-                }
+                },
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                viewModel = registerViewModel
             )
         }
         
         composable(Screen.ForgotPassword.route) {
+            val forgotPasswordViewModel = hiltViewModel<AuthViewModel>()
             ForgotPasswordScreen(
                 onNavigateToLogin = {
+                    navController.popBackStack()
+                },
+                viewModel = forgotPasswordViewModel
+            )
+        }
+
+        composable(Screen.Dashboard.route) {
+            DashboardScreen(
+                onNavigateToLogin = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                },
+                onNavigateToPredictionHistory = {
+                    navController.navigate(Screen.PredictionHistory.route)
+                },
+                onNavigateToRecommendations = {
+                    navController.navigate(Screen.Recommendations.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                }
+            )
+        }
+
+        composable(Screen.PredictionHistory.route) {
+            PredictionHistoryScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Recommendations.route) {
+            RecommendationsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = {
                     navController.popBackStack()
                 }
             )

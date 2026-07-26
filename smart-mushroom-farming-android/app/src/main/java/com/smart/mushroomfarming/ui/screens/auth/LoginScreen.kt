@@ -25,8 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import com.smart.mushroomfarming.ui.components.Visibility
-import com.smart.mushroomfarming.ui.components.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,16 +58,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.smart.mushroomfarming.domain.model.AuthState
 import com.smart.mushroomfarming.ui.components.MushroomCard
 import com.smart.mushroomfarming.ui.components.MushroomTextField
 import com.smart.mushroomfarming.ui.components.PrimaryMushroomButton
+import com.smart.mushroomfarming.ui.components.Visibility
+import com.smart.mushroomfarming.ui.components.VisibilityOff
 import com.smart.mushroomfarming.ui.theme.spacing
-import com.smart.mushroomfarming.utils.Resource
 
 @Composable
 fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     onNavigateToForgotPassword: () -> Unit,
+    onNavigateToDashboard: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -86,9 +87,17 @@ fun LoginScreen(
                     snackbarHostState.showSnackbar(event.message)
                 }
                 is AuthUiEvent.AuthSuccess -> {
-                    snackbarHostState.showSnackbar("Welcome to Smart Mushroom Farming!")
+                    onNavigateToDashboard()
                 }
             }
+        }
+    }
+
+    LaunchedEffect(uiState.authResult) {
+        val result = uiState.authResult
+        if (result is AuthState.Error) {
+            snackbarHostState.showSnackbar(result.message)
+            viewModel.clearResult()
         }
     }
 
@@ -246,7 +255,7 @@ fun LoginScreen(
                         focusManager.clearFocus()
                         viewModel.login()
                     },
-                    isLoading = uiState.authResult is Resource.Loading,
+                    isLoading = uiState.authResult is AuthState.Loading,
                     modifier = Modifier.fillMaxWidth()
                 )
 

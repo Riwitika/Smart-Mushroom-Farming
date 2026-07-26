@@ -24,8 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import com.smart.mushroomfarming.ui.components.Visibility
-import com.smart.mushroomfarming.ui.components.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -56,17 +53,21 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.smart.mushroomfarming.domain.model.AuthState
 import com.smart.mushroomfarming.ui.components.MushroomCard
 import com.smart.mushroomfarming.ui.components.MushroomTextField
 import com.smart.mushroomfarming.ui.components.PrimaryMushroomButton
+import com.smart.mushroomfarming.ui.components.Visibility
+import com.smart.mushroomfarming.ui.components.VisibilityOff
 import com.smart.mushroomfarming.ui.theme.spacing
-import com.smart.mushroomfarming.utils.Resource
 
 @Composable
 fun RegisterScreen(
     onNavigateToLogin: () -> Unit,
+    onNavigateToDashboard: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -84,9 +85,17 @@ fun RegisterScreen(
                     snackbarHostState.showSnackbar(event.message)
                 }
                 is AuthUiEvent.AuthSuccess -> {
-                    snackbarHostState.showSnackbar("Account created successfully!")
+                    onNavigateToDashboard()
                 }
             }
+        }
+    }
+
+    LaunchedEffect(uiState.authResult) {
+        val result = uiState.authResult
+        if (result is AuthState.Error) {
+            snackbarHostState.showSnackbar(result.message)
+            viewModel.clearResult()
         }
     }
 
@@ -152,7 +161,7 @@ fun RegisterScreen(
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.extraSmall))
 
                 Text(
-                    text = "Join us to manage and automate your mushroom farm",
+                    text = "Join now to manage your autonomous mushroom cultivation",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
@@ -160,7 +169,7 @@ fun RegisterScreen(
 
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.large))
 
-                // Input Area Card
+                // Input Card
                 MushroomCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -173,7 +182,7 @@ fun RegisterScreen(
                             value = uiState.name,
                             onValueChange = { viewModel.onNameChanged(it) },
                             label = "Full Name",
-                            placeholder = "Enter your full name",
+                            placeholder = "Enter your name",
                             leadingIcon = Icons.Default.Person,
                             isError = uiState.nameError != null,
                             errorText = uiState.nameError,
@@ -192,7 +201,7 @@ fun RegisterScreen(
                             value = uiState.email,
                             onValueChange = { viewModel.onEmailChanged(it) },
                             label = "Email Address",
-                            placeholder = "Enter your email address",
+                            placeholder = "Enter your email",
                             leadingIcon = Icons.Default.Email,
                             isError = uiState.emailError != null,
                             errorText = uiState.emailError,
@@ -211,7 +220,7 @@ fun RegisterScreen(
                             value = uiState.password,
                             onValueChange = { viewModel.onPasswordChanged(it) },
                             label = "Password",
-                            placeholder = "Choose a strong password",
+                            placeholder = "Choose password",
                             leadingIcon = Icons.Default.Lock,
                             isError = uiState.passwordError != null,
                             errorText = uiState.passwordError,
@@ -237,7 +246,7 @@ fun RegisterScreen(
                             value = uiState.confirmPassword,
                             onValueChange = { viewModel.onConfirmPasswordChanged(it) },
                             label = "Confirm Password",
-                            placeholder = "Re-enter your password",
+                            placeholder = "Re-enter password",
                             leadingIcon = Icons.Default.Lock,
                             isError = uiState.confirmPasswordError != null,
                             errorText = uiState.confirmPasswordError,
@@ -270,11 +279,11 @@ fun RegisterScreen(
                         focusManager.clearFocus()
                         viewModel.register()
                     },
-                    isLoading = uiState.authResult is Resource.Loading,
+                    isLoading = uiState.authResult is AuthState.Loading,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(MaterialTheme.spacing.large))
+                Spacer(modifier = Modifier.height(MaterialTheme.spacing.extraLarge))
 
                 Row(
                     horizontalArrangement = Arrangement.Center,
