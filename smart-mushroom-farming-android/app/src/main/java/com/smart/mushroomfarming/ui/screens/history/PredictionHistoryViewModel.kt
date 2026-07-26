@@ -19,6 +19,9 @@ class PredictionHistoryViewModel @Inject constructor(
     private val _history = MutableStateFlow<List<FarmingTelemetry>>(emptyList())
     val history: StateFlow<List<FarmingTelemetry>> = _history.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     private val _detailItem = MutableStateFlow<FarmingTelemetry?>(null)
     val detailItem: StateFlow<FarmingTelemetry?> = _detailItem.asStateFlow()
 
@@ -28,16 +31,32 @@ class PredictionHistoryViewModel @Inject constructor(
 
     fun loadHistory() {
         viewModelScope.launch {
-            repository.getPredictionHistory().collect { list ->
-                _history.value = list
+            _isLoading.value = true
+            try {
+                repository.getPredictionHistory().collect { list ->
+                    _history.value = list
+                    _isLoading.value = false
+                }
+            } catch (e: Exception) {
+                _isLoading.value = false
             }
         }
     }
 
+    fun refreshHistory() {
+        loadHistory()
+    }
+
     fun loadPredictionById(id: String) {
         viewModelScope.launch {
-            repository.getPredictionById(id).collect { item ->
-                _detailItem.value = item
+            _isLoading.value = true
+            try {
+                repository.getPredictionById(id).collect { item ->
+                    _detailItem.value = item
+                    _isLoading.value = false
+                }
+            } catch (e: Exception) {
+                _isLoading.value = false
             }
         }
     }

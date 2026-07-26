@@ -1,8 +1,12 @@
 package com.smart.mushroomfarming.data.repository
 
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Query
 import com.smart.mushroomfarming.data.network.api.PredictionApi
 import com.smart.mushroomfarming.data.network.dto.PredictionRequestDto
 import com.smart.mushroomfarming.domain.model.FarmingTelemetry
+import com.smart.mushroomfarming.domain.repository.AuthRepository
 import com.smart.mushroomfarming.domain.repository.PredictionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,53 +17,22 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
+
+class FirestoreSyncException(
+    val telemetry: FarmingTelemetry,
+    message: String
+) : Exception(message)
 
 @Singleton
 class RemotePredictionRepository @Inject constructor(
-    private val api: PredictionApi
+    private val api: PredictionApi,
+    private val authRepository: AuthRepository
 ) : PredictionRepository {
 
     private val _history = MutableStateFlow<List<FarmingTelemetry>>(emptyList())
-
-    init {
-        // Pre-populate with initial history to match standard telemetry logs on app start
-        val now = System.currentTimeMillis()
-        _history.value = listOf(
-            FarmingTelemetry(
-                temperature = 24.5,
-                humidity = 87.0,
-                ventilation = "High",
-                lightIntensity = "Medium",
-                ph = 6.7,
-                diseaseGrowthPossibility = "Low",
-                confidence = 97,
-                recommendation = "Continue current environmental conditions.",
-                timestamp = now - 3600000
-            ),
-            FarmingTelemetry(
-                temperature = 26.2,
-                humidity = 92.0,
-                ventilation = "Low",
-                lightIntensity = "High",
-                ph = 7.2,
-                diseaseGrowthPossibility = "Moderate",
-                confidence = 85,
-                recommendation = "Increase ventilation and monitor humidity.",
-                timestamp = now - 7200000
-            ),
-            FarmingTelemetry(
-                temperature = 28.5,
-                humidity = 95.0,
-                ventilation = "Low",
-                lightIntensity = "High",
-                ph = 5.2,
-                diseaseGrowthPossibility = "High",
-                confidence = 91,
-                recommendation = "Immediate inspection recommended.",
-                timestamp = now - 14400000
-            )
-        )
-    }
 
     override fun runPrediction(
         temperature: Double,
@@ -68,9 +41,12 @@ class RemotePredictionRepository @Inject constructor(
         lightIntensity: String,
         ph: Double
     ): Flow<FarmingTelemetry> = flow {
-        try {
-            // Execute network request DTO mappings
-            val response = api.runPrediction(
+        // 1. Retrieve the authenticated user
+        val user = authRepository.getCurrentUser() ?: throw Exception("User not authenticated.")
+
+        // 2. Query prediction output from FastAPI backend
+        val response = try {
+            api.runPrediction(
                 PredictionRequestDto(
                     temperature = temperature,
                     humidity = humidity,
@@ -79,26 +55,6 @@ class RemotePredictionRepository @Inject constructor(
                     ph = ph
                 )
             )
-
-            // Map DTO result back to telemetry domain model
-            val telemetry = FarmingTelemetry(
-                temperature = temperature,
-                humidity = humidity,
-                ventilation = ventilation,
-                lightIntensity = lightIntensity,
-                ph = ph,
-                diseaseGrowthPossibility = response.diseaseGrowthPossibilityLevel,
-                confidence = response.confidence ?: 95,
-                recommendation = response.recommendation,
-                timestamp = System.currentTimeMillis()
-            )
-
-            // Cache locally in-memory for history logs
-            val currentList = _history.value.toMutableList()
-            currentList.add(0, telemetry)
-            _history.value = currentList
-
-            emit(telemetry)
         } catch (e: UnknownHostException) {
             throw Exception("Prediction server unavailable. Please check your internet connection.")
         } catch (e: ConnectException) {
@@ -117,13 +73,154 @@ class RemotePredictionRepository @Inject constructor(
         } catch (e: Exception) {
             throw Exception(e.message ?: "An unexpected error occurred during prediction.")
         }
+
+        // 3. Map result back to telemetry domain object
+        val telemetry = FarmingTelemetry(
+            temperature = temperature,
+            humidity = humidity,
+            ventilation = ventilation,
+            lightIntensity = lightIntensity,
+            ph = ph,
+            diseaseGrowthPossibility = response.diseaseGrowthPossibilityLevel,
+            confidence = response.confidence ?: 95,
+            recommendation = response.recommendation,
+            timestamp = System.currentTimeMillis()
+        )
+
+        // 4. Try saving the prediction to Cloud Firestore
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val userRef = db.collection("users").document(user.uid)
+
+            // Save user profile info
+            val userData = hashMapOf(
+                "name" to (user.displayName ?: ""),
+                "email" to user.email,
+                "createdAt" to System.currentTimeMillis()
+            )
+            userRef.set(userData, SetOptions.merge()).await()
+
+            // Save individual prediction
+            val predictionRef = userRef.collection("predictions").document(telemetry.id)
+            val predictionData = hashMapOf(
+                "temperature" to telemetry.temperature,
+                "humidity" to telemetry.humidity,
+                "ventilation" to telemetry.ventilation,
+                "lightIntensity" to telemetry.lightIntensity,
+                "ph" to telemetry.ph,
+                "healthStatus" to response.healthStatus,
+                "diseaseGrowthPossibility" to telemetry.diseaseGrowthPossibility,
+                "diseaseRisk" to response.diseaseRiskLevel,
+                "recommendation" to telemetry.recommendation,
+                "confidence" to telemetry.confidence,
+                "timestamp" to telemetry.timestamp
+            )
+            predictionRef.set(predictionData).await()
+
+            // Cache locally in memory
+            val currentList = _history.value.toMutableList()
+            currentList.add(0, telemetry)
+            _history.value = currentList
+
+            emit(telemetry)
+        } catch (e: Exception) {
+            // Local fallback caching to prevent losing prediction data
+            val currentList = _history.value.toMutableList()
+            currentList.add(0, telemetry)
+            _history.value = currentList
+
+            // Throw sync exception carrying the telemetry results
+            throw FirestoreSyncException(telemetry, "Prediction saved locally but cloud sync failed.")
+        }
     }
 
-    override fun getPredictionHistory(): Flow<List<FarmingTelemetry>> {
-        return _history
+    override fun getPredictionHistory(): Flow<List<FarmingTelemetry>> = flow {
+        val user = authRepository.getCurrentUser()
+        if (user == null) {
+            emit(emptyList())
+            return@flow
+        }
+
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val snapshot = db.collection("users")
+                .document(user.uid)
+                .collection("predictions")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            val list = snapshot.documents.mapNotNull { doc ->
+                FarmingTelemetry(
+                    id = doc.id,
+                    temperature = doc.getDouble("temperature") ?: 0.0,
+                    humidity = doc.getDouble("humidity") ?: 0.0,
+                    ventilation = doc.getString("ventilation") ?: "Medium",
+                    lightIntensity = doc.getString("lightIntensity") ?: "Medium",
+                    ph = doc.getDouble("ph") ?: 0.0,
+                    diseaseGrowthPossibility = doc.getString("diseaseGrowthPossibility") ?: "Low",
+                    confidence = doc.getLong("confidence")?.toInt() ?: 95,
+                    recommendation = doc.getString("recommendation") ?: "",
+                    timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                )
+            }
+
+            _history.value = list
+            emit(list)
+        } catch (e: Exception) {
+            // Fallback to local logs cache if offline/failed
+            emit(_history.value)
+        }
     }
 
-    override fun getPredictionById(id: String): Flow<FarmingTelemetry?> {
-        return _history.map { list -> list.find { it.id == id } }
+    override fun getPredictionById(id: String): Flow<FarmingTelemetry?> = flow {
+        val user = authRepository.getCurrentUser()
+        if (user == null) {
+            emit(null)
+            return@flow
+        }
+
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val doc = db.collection("users")
+                .document(user.uid)
+                .collection("predictions")
+                .document(id)
+                .get()
+                .await()
+
+            if (doc.exists()) {
+                val telemetry = FarmingTelemetry(
+                    id = doc.id,
+                    temperature = doc.getDouble("temperature") ?: 0.0,
+                    humidity = doc.getDouble("humidity") ?: 0.0,
+                    ventilation = doc.getString("ventilation") ?: "Medium",
+                    lightIntensity = doc.getString("lightIntensity") ?: "Medium",
+                    ph = doc.getDouble("ph") ?: 0.0,
+                    diseaseGrowthPossibility = doc.getString("diseaseGrowthPossibility") ?: "Low",
+                    confidence = doc.getLong("confidence")?.toInt() ?: 95,
+                    recommendation = doc.getString("recommendation") ?: "",
+                    timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                )
+                emit(telemetry)
+            } else {
+                emit(_history.value.find { it.id == id })
+            }
+        } catch (e: Exception) {
+            emit(_history.value.find { it.id == id })
+        }
+    }
+
+    // Adapt GMS tasks to coroutines
+    private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T = suspendCancellableCoroutine { continuation ->
+        addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                continuation.resume(task.result)
+            } else {
+                continuation.resumeWithException(
+                    task.exception ?: Exception("Unknown Firestore task failure")
+                )
+            }
+        }
     }
 }

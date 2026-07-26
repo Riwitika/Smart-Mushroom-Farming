@@ -2,6 +2,7 @@ package com.smart.mushroomfarming.ui.screens.prediction
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.smart.mushroomfarming.data.repository.FirestoreSyncException
 import com.smart.mushroomfarming.domain.model.FarmingTelemetry
 import com.smart.mushroomfarming.domain.repository.PredictionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -124,6 +125,12 @@ class PredictionViewModel @Inject constructor(
                         isLoading = false
                     )
                 }
+            } catch (e: FirestoreSyncException) {
+                _uiState.value = _uiState.value.copy(
+                    predictionResult = e.telemetry,
+                    errorMessage = e.message,
+                    isLoading = false
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     errorMessage = e.message ?: "An unexpected error occurred during prediction.",
