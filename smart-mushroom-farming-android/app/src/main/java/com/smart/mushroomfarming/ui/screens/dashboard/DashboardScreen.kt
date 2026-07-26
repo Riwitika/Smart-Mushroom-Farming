@@ -184,7 +184,15 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        user?.email?.let { email ->
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = email,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault()).format(Date()),
                             style = MaterialTheme.typography.labelMedium,
