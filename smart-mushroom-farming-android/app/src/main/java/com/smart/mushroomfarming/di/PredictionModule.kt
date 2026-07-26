@@ -1,6 +1,6 @@
 package com.smart.mushroomfarming.di
 
-import com.smart.mushroomfarming.data.repository.InMemoryPredictionRepository
+import com.smart.mushroomfarming.data.repository.RemotePredictionRepository
 import com.smart.mushroomfarming.domain.repository.PredictionRepository
 import dagger.Binds
 import dagger.Module
@@ -15,6 +15,6 @@ abstract class PredictionModule {
     @Binds
     @Singleton
     abstract fun bindPredictionRepository(
-        inMemoryPredictionRepository: InMemoryPredictionRepository
+        remotePredictionRepository: RemotePredictionRepository
     ): PredictionRepository
 }

@@ -35,10 +35,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +79,21 @@ fun PredictionScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
+    
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { error ->
+            val result = snackbarHostState.showSnackbar(
+                message = error,
+                actionLabel = "Retry"
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.runPrediction()
+            }
+            viewModel.clearError()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -87,7 +106,10 @@ fun PredictionScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        enabled = !uiState.isLoading
+                    ) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back"
@@ -100,6 +122,7 @@ fun PredictionScreen(
                 )
             )
         },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
@@ -139,7 +162,7 @@ fun PredictionScreen(
                         // Temperature Input
                         MushroomTextField(
                             value = uiState.temperature,
-                            onValueChange = { viewModel.onTemperatureChanged(it) },
+                            onValueChange = { if (!uiState.isLoading) viewModel.onTemperatureChanged(it) },
                             label = "Temperature (°C)",
                             placeholder = "e.g. 24.5",
                             leadingIcon = Icons.Filled.Temperature,
@@ -157,7 +180,7 @@ fun PredictionScreen(
                         // Humidity Input
                         MushroomTextField(
                             value = uiState.humidity,
-                            onValueChange = { viewModel.onHumidityChanged(it) },
+                            onValueChange = { if (!uiState.isLoading) viewModel.onHumidityChanged(it) },
                             label = "Humidity (%)",
                             placeholder = "e.g. 85.0",
                             leadingIcon = Icons.Filled.Humidity,
@@ -178,7 +201,8 @@ fun PredictionScreen(
                             options = listOf("Low", "Medium", "High"),
                             selectedOption = uiState.ventilation,
                             onOptionSelected = { viewModel.onVentilationChanged(it) },
-                            leadingIcon = Icons.Filled.Ventilation
+                            leadingIcon = Icons.Filled.Ventilation,
+                            enabled = !uiState.isLoading
                         )
 
                         // Light Intensity Dropdown
@@ -187,13 +211,14 @@ fun PredictionScreen(
                             options = listOf("Low", "Medium", "High"),
                             selectedOption = uiState.lightIntensity,
                             onOptionSelected = { viewModel.onLightIntensityChanged(it) },
-                            leadingIcon = Icons.Filled.LightIntensity
+                            leadingIcon = Icons.Filled.LightIntensity,
+                            enabled = !uiState.isLoading
                         )
 
                         // pH Level Input
                         MushroomTextField(
                             value = uiState.ph,
-                            onValueChange = { viewModel.onPhChanged(it) },
+                            onValueChange = { if (!uiState.isLoading) viewModel.onPhChanged(it) },
                             label = "pH Level",
                             placeholder = "e.g. 6.5",
                             leadingIcon = Icons.Filled.Ph,
@@ -206,7 +231,7 @@ fun PredictionScreen(
                             keyboardActions = KeyboardActions(
                                 onDone = {
                                     focusManager.clearFocus()
-                                    if (uiState.isFormValid) {
+                                    if (uiState.isFormValid && !uiState.isLoading) {
                                         viewModel.runPrediction()
                                     }
                                 }
@@ -222,7 +247,7 @@ fun PredictionScreen(
                         focusManager.clearFocus()
                         viewModel.runPrediction()
                     },
-                    enabled = uiState.isFormValid,
+                    enabled = uiState.isFormValid && !uiState.isLoading,
                     isLoading = uiState.isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -356,19 +381,21 @@ fun DropdownSelector(
     selectedOption: String,
     onOptionSelected: (String) -> Unit,
     leadingIcon: ImageVector,
+    enabled: Boolean,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
+        expanded = expanded && enabled,
+        onExpandedChange = { if (enabled) expanded = !expanded },
         modifier = modifier.fillMaxWidth()
     ) {
         OutlinedTextField(
             value = selectedOption,
             onValueChange = {},
             readOnly = true,
+            enabled = enabled,
             label = { Text(label) },
             leadingIcon = { Icon(imageVector = leadingIcon, contentDescription = null) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -378,7 +405,7 @@ fun DropdownSelector(
             shape = MaterialTheme.shapes.medium
         )
         ExposedDropdownMenu(
-            expanded = expanded,
+            expanded = expanded && enabled,
             onDismissRequest = { expanded = false }
         ) {
             options.forEach { selectionOption ->

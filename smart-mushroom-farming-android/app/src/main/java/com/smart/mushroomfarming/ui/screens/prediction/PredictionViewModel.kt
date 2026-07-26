@@ -22,7 +22,8 @@ data class PredictionUiState(
     val phError: String? = null,
     val predictionResult: FarmingTelemetry? = null,
     val isLoading: Boolean = false,
-    val isFormValid: Boolean = false
+    val isFormValid: Boolean = false,
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -101,20 +102,31 @@ class PredictionViewModel @Inject constructor(
         if (!state.isFormValid) return
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, predictionResult = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true, 
+                predictionResult = null, 
+                errorMessage = null
+            )
             val temp = state.temperature.toDouble()
             val hum = state.humidity.toDouble()
             val phVal = state.ph.toDouble()
             
-            repository.runPrediction(
-                temperature = temp,
-                humidity = hum,
-                ventilation = state.ventilation,
-                lightIntensity = state.lightIntensity,
-                ph = phVal
-            ).collect { result ->
+            try {
+                repository.runPrediction(
+                    temperature = temp,
+                    humidity = hum,
+                    ventilation = state.ventilation,
+                    lightIntensity = state.lightIntensity,
+                    ph = phVal
+                ).collect { result ->
+                    _uiState.value = _uiState.value.copy(
+                        predictionResult = result,
+                        isLoading = false
+                    )
+                }
+            } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    predictionResult = result,
+                    errorMessage = e.message ?: "An unexpected error occurred during prediction.",
                     isLoading = false
                 )
             }
@@ -123,5 +135,9 @@ class PredictionViewModel @Inject constructor(
 
     fun clearResult() {
         _uiState.value = _uiState.value.copy(predictionResult = null)
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 }
