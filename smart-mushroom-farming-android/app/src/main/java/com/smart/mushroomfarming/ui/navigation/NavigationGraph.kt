@@ -6,17 +6,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.smart.mushroomfarming.ui.screens.auth.AuthViewModel
 import com.smart.mushroomfarming.ui.screens.auth.ForgotPasswordScreen
 import com.smart.mushroomfarming.ui.screens.auth.LoginScreen
 import com.smart.mushroomfarming.ui.screens.auth.RegisterScreen
 import com.smart.mushroomfarming.ui.screens.dashboard.DashboardScreen
-import com.smart.mushroomfarming.ui.screens.dashboard.PredictionHistoryScreen
 import com.smart.mushroomfarming.ui.screens.dashboard.RecommendationsScreen
-import com.smart.mushroomfarming.ui.screens.dashboard.SettingsScreen
+import com.smart.mushroomfarming.ui.screens.history.PredictionDetailScreen
+import com.smart.mushroomfarming.ui.screens.history.PredictionHistoryScreen
+import com.smart.mushroomfarming.ui.screens.prediction.PredictionScreen
+import com.smart.mushroomfarming.ui.screens.settings.SettingsScreen
 import com.smart.mushroomfarming.ui.screens.splash.SplashScreen
 
 @Composable
@@ -118,6 +122,9 @@ fun NavigationGraph() {
                         popUpTo(Screen.Dashboard.route) { inclusive = true }
                     }
                 },
+                onNavigateToPrediction = {
+                    navController.navigate(Screen.Prediction.route)
+                },
                 onNavigateToPredictionHistory = {
                     navController.navigate(Screen.PredictionHistory.route)
                 },
@@ -130,8 +137,34 @@ fun NavigationGraph() {
             )
         }
 
+        composable(Screen.Prediction.route) {
+            PredictionScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
         composable(Screen.PredictionHistory.route) {
             PredictionHistoryScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToDetail = { id ->
+                    navController.navigate(Screen.PredictionDetail.createRoute(id))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.PredictionDetail.route,
+            arguments = listOf(
+                navArgument("predictionId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val predictionId = backStackEntry.arguments?.getString("predictionId").orEmpty()
+            PredictionDetailScreen(
+                predictionId = predictionId,
                 onNavigateBack = {
                     navController.popBackStack()
                 }

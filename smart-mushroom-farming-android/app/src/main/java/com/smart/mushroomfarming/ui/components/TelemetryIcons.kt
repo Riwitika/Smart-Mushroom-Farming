@@ -25,6 +25,9 @@ val Icons.Filled.Ph: ImageVector
 val Icons.Filled.History: ImageVector
     get() = HistoryIcon
 
+val Icons.Filled.Prediction: ImageVector
+    get() = PredictionIcon
+
 private val TemperatureIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Temperature",
@@ -288,5 +291,40 @@ private val HistoryIcon: ImageVector by lazy {
         verticalLineTo(8f)
         horizontalLineTo(12f)
         close()
+    }.build()
+}
+
+private val PredictionIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "Prediction",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).path(
+        fill = SolidColor(Color.Black)
+    ) {
+        moveTo(12f, 2f)
+        curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+        reflectiveCurveTo(6.48f, 22f, 12f, 22f)
+        reflectiveCurveTo(22f, 17.52f, 22f, 12f)
+        reflectiveCurveTo(17.52f, 2f, 12f, 2f)
+        close()
+        
+        moveTo(12f, 20f)
+        curveTo(7.59f, 20f, 4f, 16.41f, 4f, 12f)
+        reflectiveCurveTo(7.59f, 4f, 12f, 4f)
+        reflectiveCurveTo(20f, 7.59f, 20f, 12f)
+        reflectiveCurveTo(16.41f, 20f, 12f, 20f)
+        close()
+        
+        moveTo(12f, 6f)
+        verticalLineTo(10f)
+        moveTo(12f, 14f)
+        verticalLineTo(18f)
+        moveTo(6f, 12f)
+        horizontalLineTo(10f)
+        moveTo(14f, 12f)
+        horizontalLineTo(18f)
     }.build()
 }

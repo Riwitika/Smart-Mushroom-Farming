@@ -1,6 +1,9 @@
 package com.smart.mushroomfarming.domain.model
 
+import java.util.UUID
+
 data class FarmingTelemetry(
+    val id: String = UUID.randomUUID().toString(),
     val temperature: Double,
     val humidity: Double,
     val ventilation: String, // "Low", "Medium", "High"

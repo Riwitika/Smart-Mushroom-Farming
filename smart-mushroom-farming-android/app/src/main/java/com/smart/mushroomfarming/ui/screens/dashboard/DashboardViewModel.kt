@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smart.mushroomfarming.domain.model.FarmingTelemetry
 import com.smart.mushroomfarming.domain.repository.DashboardRepository
+import com.smart.mushroomfarming.domain.repository.PredictionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,8 @@ data class DashboardUiState(
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val repository: DashboardRepository
+    private val dashboardRepository: DashboardRepository,
+    private val predictionRepository: PredictionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -35,13 +37,13 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             combine(
-                repository.getCurrentTelemetry(),
-                repository.getRecentPredictions()
+                dashboardRepository.getCurrentTelemetry(),
+                predictionRepository.getPredictionHistory()
             ) { telemetry, history ->
                 DashboardUiState(
                     currentTelemetry = telemetry,
-                    recentPredictions = history,
-                    insights = repository.getFarmInsights(telemetry),
+                    recentPredictions = history.take(3), // Display top 3 items
+                    insights = dashboardRepository.getFarmInsights(telemetry),
                     isLoading = false
                 )
             }.collect { state ->

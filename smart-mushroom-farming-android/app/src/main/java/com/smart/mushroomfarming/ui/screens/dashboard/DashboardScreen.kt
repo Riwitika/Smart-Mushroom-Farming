@@ -1,6 +1,5 @@
 package com.smart.mushroomfarming.ui.screens.dashboard
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -23,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
-import com.smart.mushroomfarming.ui.components.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -56,9 +54,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smart.mushroomfarming.domain.model.FarmingTelemetry
 import com.smart.mushroomfarming.ui.components.Humidity
+import com.smart.mushroomfarming.ui.components.History
 import com.smart.mushroomfarming.ui.components.LightIntensity
 import com.smart.mushroomfarming.ui.components.MushroomCard
 import com.smart.mushroomfarming.ui.components.Ph
+import com.smart.mushroomfarming.ui.components.Prediction
 import com.smart.mushroomfarming.ui.components.Temperature
 import com.smart.mushroomfarming.ui.components.Ventilation
 import com.smart.mushroomfarming.ui.screens.auth.AuthViewModel
@@ -71,6 +71,7 @@ import java.util.Locale
 @Composable
 fun DashboardScreen(
     onNavigateToLogin: () -> Unit,
+    onNavigateToPrediction: () -> Unit,
     onNavigateToPredictionHistory: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -505,7 +506,7 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.large))
 
-                // Quick Actions
+                // Quick Actions 2x2 Grid
                 Text(
                     text = "Quick Actions",
                     style = MaterialTheme.typography.titleLarge,
@@ -516,28 +517,44 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.small))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    ActionCard(
-                        modifier = Modifier.weight(1f),
-                        title = "History",
-                        icon = Icons.Default.History,
-                        onClick = onNavigateToPredictionHistory
-                    )
-                    ActionCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Guide",
-                        icon = Icons.Default.Star,
-                        onClick = onNavigateToRecommendations
-                    )
-                    ActionCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Settings",
-                        icon = Icons.Default.Settings,
-                        onClick = onNavigateToSettings
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)
+                    ) {
+                        ActionCard(
+                            modifier = Modifier.weight(1f),
+                            title = "AI Predict",
+                            icon = Icons.Filled.Prediction,
+                            onClick = onNavigateToPrediction
+                        )
+                        ActionCard(
+                            modifier = Modifier.weight(1f),
+                            title = "History Log",
+                            icon = Icons.Filled.History,
+                            onClick = onNavigateToPredictionHistory
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)
+                    ) {
+                        ActionCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Cultivation Guide",
+                            icon = Icons.Default.Star,
+                            onClick = onNavigateToRecommendations
+                        )
+                        ActionCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Preferences",
+                            icon = Icons.Default.Settings,
+                            onClick = onNavigateToSettings
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(MaterialTheme.spacing.large))
