@@ -49,7 +49,7 @@ gitignore file
 Installation and Setup
 
 Step one, clone the repository.
-git clone https://github.com/Riwitika/Smart Mushroom Farming.git
+git clone https://github.com/Riwitika/Smart-Mushroom-Farming.git
 cd Smart Mushroom Farming
 
 Step two, create a virtual environment. This is recommended but optional.
